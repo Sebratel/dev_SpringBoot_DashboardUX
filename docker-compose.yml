@@ -1,0 +1,16 @@
+# Stack para Portainer. Backend puro (Spring Boot) - a automacao roda em
+# outro stack/container proprio (ver automation/docker-compose.yml), chamado
+# via REST (AUTOMATION_BASE_URL). Acesso e por IP:porta - ajuste os defaults
+# abaixo se o IP/portas do host mudarem.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3210:3210"
+    environment:
+      SERVER_PORT: "3210"
+      AUTOMATION_BASE_URL: "${AUTOMATION_BASE_URL:-http://186.219.134.246:3212}"
+      APP_CORS_ALLOWED_ORIGINS: "${APP_CORS_ALLOWED_ORIGINS:-http://186.219.134.246:3211}"
+    restart: unless-stopped
