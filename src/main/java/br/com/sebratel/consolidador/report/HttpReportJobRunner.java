@@ -85,6 +85,8 @@ public class HttpReportJobRunner implements ReportJobRunner {
             job.markDone(availableReports,
                     "Relatorios baixados com sucesso (" + String.join(", ", availableReports)
                             + "). A consolidacao final em um unico arquivo sera feita em uma proxima etapa.");
+        } else if (status.errors().isEmpty()) {
+            job.markFailed(status.message());
         } else {
             String errorList = status.errors().entrySet().stream()
                     .map(entry -> entry.getKey() + ": " + entry.getValue())
