@@ -8,7 +8,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports/jobs")
@@ -57,5 +59,29 @@ public class ReportJobController {
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + job.getResultFile().getFileName() + "\"")
                 .body(file);
+    }
+
+    /**
+     * Baixa o CSV bruto de UM dos relatorios concorrentes (chave "atendimento"
+     * ou "hsm" - ver REPORT_DEFINITIONS no script Node) assim que ele termina,
+     * mesmo antes da consolidacao final existir. Ver ReportJob.recordResultFiles.
+     */
+    @GetMapping("/{jobId}/download/{report}")
+    public ResponseEntity<FileSystemResource> downloadReport(@PathVariable String jobId, @PathVariable String report) {
+        ReportJob job = service.find(jobId)
+                .orElseThrow(() -> new ReportJobNotFoundException(jobId));
+
+        Map<String, Path> resultFiles = job.getResultFiles();
+        Path file = resultFiles != null ? resultFiles.get(report) : null;
+        if (file == null) {
+            throw new ReportFileNotAvailableException(jobId, report);
+        }
+
+        FileSystemResource resource = new FileSystemResource(file);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + file.getFileName() + "\"")
+                .body(resource);
     }
 }

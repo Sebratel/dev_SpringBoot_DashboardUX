@@ -20,6 +20,12 @@ public class ReportJobExceptionHandler {
                 .body(new ApiError(ex.getMessage()));
     }
 
+    @ExceptionHandler(ReportFileNotAvailableException.class)
+    public ResponseEntity<ApiError> handleReportFileNotAvailable(ReportFileNotAvailableException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiError(ex.getMessage()));
+    }
+
     public record ApiError(String message) {
     }
 }
