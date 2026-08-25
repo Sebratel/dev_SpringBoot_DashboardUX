@@ -3,6 +3,7 @@ package br.com.sebratel.consolidador.report;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Body de resposta de GET /api/reports/jobs/{jobId} e GET /api/reports/jobs.
@@ -38,13 +39,16 @@ public record ReportJobStatusResponse(
                 .map(step -> new StepResponse(step.percent(), step.message(), step.timestamp().toString()))
                 .toList();
 
-        // Um link por relatorio individual (atendimento/hsm) que ja terminou
-        // de baixar, mesmo que o job inteiro ainda nao esteja DONE (falha
-        // parcial) ou que a consolidacao final (resultFile acima) nao exista.
+        // Um link por relatorio individual (atendimento/hsm/hsmPosInstalacao)
+        // que ja terminou de baixar, mesmo que o job inteiro ainda nao
+        // esteja DONE (falha parcial) ou que a consolidacao final
+        // (resultFile acima) nao exista. Os bytes ficam no servico de
+        // automacao - este link e sempre proxiado pelo BFF (ver
+        // ReportJobController.downloadReport).
         Map<String, String> reportDownloadUrls = new LinkedHashMap<>();
-        Map<String, java.nio.file.Path> resultFiles = job.getResultFiles();
-        if (resultFiles != null) {
-            resultFiles.keySet().forEach(report ->
+        Set<String> availableReports = job.getAvailableReports();
+        if (availableReports != null) {
+            availableReports.forEach(report ->
                     reportDownloadUrls.put(report, "/api/reports/jobs/" + job.getId() + "/download/" + report));
         }
 

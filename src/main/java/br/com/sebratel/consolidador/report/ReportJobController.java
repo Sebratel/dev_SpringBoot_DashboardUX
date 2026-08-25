@@ -1,25 +1,25 @@
 package br.com.sebratel.consolidador.report;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.file.Path;
+import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports/jobs")
 public class ReportJobController {
 
     private final ReportJobService service;
+    private final AutomationClient automationClient;
 
-    public ReportJobController(ReportJobService service) {
+    public ReportJobController(ReportJobService service, AutomationClient automationClient) {
         this.service = service;
+        this.automationClient = automationClient;
     }
 
     /** Lista todos os jobs conhecidos (desde o ultimo restart do BFF) - util para recuperar um jobId perdido. */
@@ -44,44 +44,37 @@ public class ReportJobController {
         return ReportJobStatusResponse.from(job);
     }
 
-    @GetMapping("/{jobId}/download")
-    public ResponseEntity<FileSystemResource> download(@PathVariable String jobId) {
-        ReportJob job = service.find(jobId)
-                .orElseThrow(() -> new ReportJobNotFoundException(jobId));
-
-        if (job.getStatus() != JobStatus.DONE || job.getResultFile() == null) {
-            throw new ReportJobNotReadyException(jobId, job.getStatus());
-        }
-
-        FileSystemResource file = new FileSystemResource(job.getResultFile());
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + job.getResultFile().getFileName() + "\"")
-                .body(file);
-    }
-
     /**
-     * Baixa o CSV bruto de UM dos relatorios concorrentes (chave "atendimento"
-     * ou "hsm" - ver REPORT_DEFINITIONS no script Node) assim que ele termina,
-     * mesmo antes da consolidacao final existir. Ver ReportJob.recordResultFiles.
+     * Baixa o CSV bruto de UM dos relatorios concorrentes (chave
+     * "atendimento"/"hsm"/"hsmPosInstalacao"). Os bytes vivem no servico de
+     * automacao (container/porta 3212 - ver ReportJob.getAvailableReports),
+     * entao este endpoint faz proxy da resposta em streaming, sem carregar
+     * o arquivo inteiro na memoria do BFF (relatorios grandes podem passar
+     * de 100MB).
      */
     @GetMapping("/{jobId}/download/{report}")
-    public ResponseEntity<FileSystemResource> downloadReport(@PathVariable String jobId, @PathVariable String report) {
+    public void downloadReport(@PathVariable String jobId, @PathVariable String report, HttpServletResponse response)
+            throws IOException {
         ReportJob job = service.find(jobId)
                 .orElseThrow(() -> new ReportJobNotFoundException(jobId));
 
-        Map<String, Path> resultFiles = job.getResultFiles();
-        Path file = resultFiles != null ? resultFiles.get(report) : null;
-        if (file == null) {
+        if (!job.getAvailableReports().contains(report)) {
             throw new ReportFileNotAvailableException(jobId, report);
         }
 
-        FileSystemResource resource = new FileSystemResource(file);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("text/csv"))
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + file.getFileName() + "\"")
-                .body(resource);
+        automationClient.restClient().get()
+                .uri("/jobs/{id}/download/{report}", job.getAutomationJobId(), report)
+                .exchange((clientRequest, clientResponse) -> {
+                    MediaType contentType = clientResponse.getHeaders().getContentType();
+                    response.setContentType(contentType != null ? contentType.toString() : "text/csv");
+
+                    String disposition = clientResponse.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION);
+                    if (disposition != null) {
+                        response.setHeader(HttpHeaders.CONTENT_DISPOSITION, disposition);
+                    }
+
+                    clientResponse.getBody().transferTo(response.getOutputStream());
+                    return null;
+                });
     }
 }

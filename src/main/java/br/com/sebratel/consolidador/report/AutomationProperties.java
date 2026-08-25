@@ -3,42 +3,33 @@ package br.com.sebratel.consolidador.report;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Configuracao de onde/como chamar o script de automacao Node existente.
- * Ver application.properties (prefixo "automation").
+ * Configuracao de como chamar o servico HTTP de automacao (Node/Playwright,
+ * ver automation/src/server.js), que roda no seu proprio container/porta
+ * (3212) - o BFF nao spawna mais um subprocesso local (ver
+ * HttpReportJobRunner, que substituiu o antigo NodeProcessReportJobRunner).
  */
 @ConfigurationProperties(prefix = "automation")
 public class AutomationProperties {
 
-    /** Executavel do Node (ex: "node", ou caminho absoluto se nao estiver no PATH). */
-    private String nodeExecutable = "node";
+    /** URL base do servico de automacao (ex.: http://186.219.134.246:3212). */
+    private String baseUrl = "http://localhost:3212";
 
-    /** Caminho para automation/src/index.js, absoluto ou relativo ao working dir do BFF. */
-    private String scriptPath;
+    /** Intervalo entre polls ao status do job no servico de automacao (ms). */
+    private long pollIntervalMs = 2000;
 
-    /** Diretorio de trabalho do processo Node (a pasta automation/). */
-    private String workingDir;
-
-    public String getNodeExecutable() {
-        return nodeExecutable;
+    public String getBaseUrl() {
+        return baseUrl;
     }
 
-    public void setNodeExecutable(String nodeExecutable) {
-        this.nodeExecutable = nodeExecutable;
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
     }
 
-    public String getScriptPath() {
-        return scriptPath;
+    public long getPollIntervalMs() {
+        return pollIntervalMs;
     }
 
-    public void setScriptPath(String scriptPath) {
-        this.scriptPath = scriptPath;
-    }
-
-    public String getWorkingDir() {
-        return workingDir;
-    }
-
-    public void setWorkingDir(String workingDir) {
-        this.workingDir = workingDir;
+    public void setPollIntervalMs(long pollIntervalMs) {
+        this.pollIntervalMs = pollIntervalMs;
     }
 }

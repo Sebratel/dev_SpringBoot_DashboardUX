@@ -5,7 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,13 +14,14 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Estado de um job de geracao de relatorio, compartilhado entre a thread
- * HTTP que consulta o progresso e a thread que le o stdout do subprocesso
- * Node. Os campos mutaveis usam tipos atomicos porque sao escritos por uma
- * thread e lidos por varias, sem necessidade de um lock explicito.
+ * HTTP que consulta o progresso e a thread que faz polling no servico de
+ * automacao (ver HttpReportJobRunner). Os campos mutaveis usam tipos
+ * atomicos porque sao escritos por uma thread e lidos por varias, sem
+ * necessidade de um lock explicito.
  *
  * Alem do status "atual" (percent/message), tambem guarda um HISTORICO de
- * etapas (steps) e o PID do processo Node - dados usados so pela tela de
- * Auditoria (ver ReportJobStatusResponse), nao pelo fluxo normal de
+ * etapas (steps) e o PID do processo de automacao - dados usados so pela
+ * tela de Auditoria (ver ReportJobStatusResponse), nao pelo fluxo normal de
  * polling da tela principal.
  */
 public class ReportJob {
@@ -35,17 +36,21 @@ public class ReportJob {
     private final AtomicReference<String> message = new AtomicReference<>("Aguardando inicio...");
     private final AtomicReference<Path> resultFile = new AtomicReference<>();
     /**
-     * Caminhos dos CSVs brutos de cada relatorio (chaves: "atendimento",
-     * "hsm" - ver REPORT_DEFINITIONS no script Node) apos os dois downloads
-     * concorrentes terminarem. So preenchido quando markDone(Map, String) e
-     * usado (fluxo de dois relatorios); a consolidacao final num unico
-     * arquivo baixavel (resultFile/getResultFile) e uma etapa futura.
+     * Chaves dos relatorios ("atendimento"/"hsm"/"hsmPosInstalacao") cujo
+     * CSV bruto ja esta disponivel para download no servico de automacao -
+     * os bytes em si vivem la, nao neste processo (ver
+     * ReportJobController.downloadReport, que faz proxy). So preenchido
+     * quando markDone(Set, String) e usado (fluxo dos 3 relatorios); a
+     * consolidacao final num unico arquivo baixavel (resultFile/
+     * getResultFile) e uma etapa futura.
      */
-    private final AtomicReference<Map<String, Path>> resultFiles = new AtomicReference<>();
+    private final AtomicReference<Set<String>> availableReports = new AtomicReference<>(Set.of());
 
     private final AtomicLong pid = new AtomicLong(-1);
     private final AtomicReference<Instant> finishedAt = new AtomicReference<>();
     private final List<Step> steps = new CopyOnWriteArrayList<>();
+    /** Id do job no servico de automacao (diferente deste id) - usado para proxiar downloads. */
+    private final AtomicReference<String> automationJobId = new AtomicReference<>();
 
     public ReportJob(LocalDate dataInicio, LocalDate dataFim) {
         this.dataInicio = dataInicio;
@@ -84,21 +89,21 @@ public class ReportJob {
         return resultFile.get();
     }
 
-    public Map<String, Path> getResultFiles() {
-        return resultFiles.get();
+    public Set<String> getAvailableReports() {
+        return availableReports.get();
     }
 
     /**
-     * Registra os arquivos brutos ja baixados com sucesso, independente do
-     * job terminar em DONE ou FAILED - por exemplo, quando so um dos dois
-     * relatorios concorrentes teve sucesso (ver markFailed logo em
-     * seguida), o arquivo do que deu certo nao deve se perder.
+     * Registra quais relatorios brutos ja estao disponiveis, independente
+     * do job terminar em DONE ou FAILED - por exemplo, quando so alguns dos
+     * 3 relatorios concorrentes tiveram sucesso (ver markFailed logo em
+     * seguida), os que deram certo nao devem se perder.
      */
-    public void recordResultFiles(Map<String, Path> resultFiles) {
-        this.resultFiles.set(resultFiles);
+    public void recordAvailableReports(Set<String> availableReports) {
+        this.availableReports.set(availableReports);
     }
 
-    /** PID do processo `node automation/src/index.js`, ou -1 se ainda nao iniciado. */
+    /** PID do processo Node do servico de automacao, ou -1 se ainda nao conhecido. */
     public long getPid() {
         return pid.get();
     }
@@ -124,14 +129,30 @@ public class ReportJob {
         this.pid.set(pid);
     }
 
+    public String getAutomationJobId() {
+        return automationJobId.get();
+    }
+
+    public void setAutomationJobId(String automationJobId) {
+        this.automationJobId.set(automationJobId);
+    }
+
     public void markRunning() {
         status.set(JobStatus.RUNNING);
     }
 
-    public void updateProgress(int newPercent, String newMessage) {
+    /**
+     * Sincroniza percent/message/steps a partir da resposta mais recente do
+     * servico de automacao (GET /jobs/{id}) - diferente do antigo modelo de
+     * ler stdout linha a linha, aqui o servico ja devolve o HISTORICO
+     * completo de steps a cada poll, entao so substituimos a lista local em
+     * vez de acumular (evita duplicar steps ja vistos em polls anteriores).
+     */
+    public void syncProgress(int newPercent, String newMessage, List<Step> newSteps) {
         percent.set(newPercent);
         message.set(newMessage);
-        steps.add(new Step(newPercent, newMessage, Instant.now()));
+        steps.clear();
+        steps.addAll(newSteps);
     }
 
     public void markDone(Path filePath) {
@@ -143,13 +164,13 @@ public class ReportJob {
     }
 
     /**
-     * Marca a conclusao do download dos relatorios brutos (atendimento +
-     * HSM), antes da consolidacao final num unico arquivo baixavel - por
-     * isso nao mexe em resultFile/downloadUrl, so registra onde os arquivos
-     * ficaram para a proxima etapa (consolidacao) usar.
+     * Marca a conclusao do download dos relatorios brutos, antes da
+     * consolidacao final num unico arquivo baixavel - por isso nao mexe em
+     * resultFile/downloadUrl, so registra quais relatorios ficaram
+     * disponiveis para a proxima etapa (consolidacao) usar.
      */
-    public void markDone(Map<String, Path> resultFiles, String message) {
-        this.resultFiles.set(resultFiles);
+    public void markDone(Set<String> availableReports, String message) {
+        this.availableReports.set(availableReports);
         percent.set(100);
         this.message.set(message);
         status.set(JobStatus.DONE);
