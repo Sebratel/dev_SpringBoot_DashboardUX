@@ -24,6 +24,10 @@ public class ReauthController {
     }
 
     private String novncUrl() {
+        String publicUrl = properties.getPublicVncUrl();
+        if (publicUrl != null && !publicUrl.isBlank()) {
+            return publicUrl;
+        }
         String host = properties.getPublicHost();
         if (host == null || host.isBlank()) {
             host = URI.create(properties.getBaseUrl()).getHost();

@@ -13,5 +13,6 @@ services:
       SERVER_PORT: "3210"
       AUTOMATION_BASE_URL: "${AUTOMATION_BASE_URL:-http://186.219.134.246:3212}"
       AUTOMATION_PUBLIC_HOST: "${AUTOMATION_PUBLIC_HOST:-}"
-      APP_CORS_ALLOWED_ORIGINS: "${APP_CORS_ALLOWED_ORIGINS:-http://186.219.134.246:3211}"
+      AUTOMATION_PUBLIC_VNC_URL: "${AUTOMATION_PUBLIC_VNC_URL:-https://kibana-staging.sebratel.net.br/vnc/vnc.html?autoconnect=true&resize=scale}"
+      APP_CORS_ALLOWED_ORIGINS: "${APP_CORS_ALLOWED_ORIGINS:-http://186.219.134.246:3211,https://kibana-staging.sebratel.net.br}"
     restart: unless-stopped

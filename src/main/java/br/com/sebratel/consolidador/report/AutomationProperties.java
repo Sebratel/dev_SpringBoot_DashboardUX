@@ -23,6 +23,15 @@ public class AutomationProperties {
      */
     private String publicHost;
 
+    /**
+     * URL publica completa do noVNC (ver ReauthController) - tem prioridade
+     * sobre publicHost/baseUrl quando definida. Use quando o noVNC estiver
+     * atras de um reverse proxy com dominio proprio (ex.:
+     * "https://kibana-staging.sebratel.net.br/vnc/vnc.html?autoconnect=true&resize=scale"),
+     * em vez do acesso direto por "http://host:6080/...".
+     */
+    private String publicVncUrl;
+
     /** Intervalo entre polls ao status do job no servico de automacao (ms). */
     private long pollIntervalMs = 2000;
 
@@ -40,6 +49,14 @@ public class AutomationProperties {
 
     public void setPublicHost(String publicHost) {
         this.publicHost = publicHost;
+    }
+
+    public String getPublicVncUrl() {
+        return publicVncUrl;
+    }
+
+    public void setPublicVncUrl(String publicVncUrl) {
+        this.publicVncUrl = publicVncUrl;
     }
 
     public long getPollIntervalMs() {
