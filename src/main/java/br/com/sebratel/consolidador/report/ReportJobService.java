@@ -34,10 +34,10 @@ public class ReportJobService {
         this.runner = runner;
     }
 
-    public ReportJob create(LocalDate dataInicio, LocalDate dataFim) {
-        ReportJob job = new ReportJob(dataInicio, dataFim);
+    public ReportJob create(LocalDate dataInicio, LocalDate dataFim, String mode) {
+        ReportJob job = new ReportJob(dataInicio, dataFim, mode);
         jobs.put(job.getId(), job);
-        log.info("Job criado: id={} dataInicio={} dataFim={}", job.getId(), dataInicio, dataFim);
+        log.info("Job criado: id={} dataInicio={} dataFim={} mode={}", job.getId(), dataInicio, dataFim, job.getMode());
         executor.submit(() -> runner.run(job));
         return job;
     }

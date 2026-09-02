@@ -45,7 +45,7 @@ public class HttpReportJobRunner implements ReportJobRunner {
             AutomationJobCreatedResponse created = restClient.post()
                     .uri("/jobs")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new AutomationJobRequest(DATE_FORMAT.format(job.getDataInicio()), DATE_FORMAT.format(job.getDataFim())))
+                    .body(new AutomationJobRequest(DATE_FORMAT.format(job.getDataInicio()), DATE_FORMAT.format(job.getDataFim()), job.getMode()))
                     .retrieve()
                     .body(AutomationJobCreatedResponse.class);
             automationJobId = created.jobId();
@@ -102,7 +102,7 @@ public class HttpReportJobRunner implements ReportJobRunner {
                 .toList();
     }
 
-    private record AutomationJobRequest(String dateFrom, String dateTo) {
+    private record AutomationJobRequest(String dateFrom, String dateTo, String mode) {
     }
 
     private record AutomationJobCreatedResponse(String jobId) {

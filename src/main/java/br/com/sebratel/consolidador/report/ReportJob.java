@@ -29,6 +29,8 @@ public class ReportJob {
     private final String id = UUID.randomUUID().toString();
     private final LocalDate dataInicio;
     private final LocalDate dataFim;
+    /** "api" ou "novnc" - ver runReportJob.js no servico de automacao. */
+    private final String mode;
     private final Instant createdAt = Instant.now();
 
     private final AtomicReference<JobStatus> status = new AtomicReference<>(JobStatus.PENDING);
@@ -52,9 +54,10 @@ public class ReportJob {
     /** Id do job no servico de automacao (diferente deste id) - usado para proxiar downloads. */
     private final AtomicReference<String> automationJobId = new AtomicReference<>();
 
-    public ReportJob(LocalDate dataInicio, LocalDate dataFim) {
+    public ReportJob(LocalDate dataInicio, LocalDate dataFim, String mode) {
         this.dataInicio = dataInicio;
         this.dataFim = dataFim;
+        this.mode = (mode == null || mode.isBlank()) ? "api" : mode;
     }
 
     public String getId() {
@@ -67,6 +70,10 @@ public class ReportJob {
 
     public LocalDate getDataFim() {
         return dataFim;
+    }
+
+    public String getMode() {
+        return mode;
     }
 
     public Instant getCreatedAt() {

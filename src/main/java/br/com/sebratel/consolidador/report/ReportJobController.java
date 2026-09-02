@@ -33,7 +33,7 @@ public class ReportJobController {
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public ReportJobCreatedResponse create(@Valid @RequestBody ReportGenerationRequest request) {
-        ReportJob job = service.create(request.dataInicio(), request.dataFim());
+        ReportJob job = service.create(request.dataInicio(), request.dataFim(), request.mode());
         return ReportJobCreatedResponse.from(job);
     }
 
