@@ -80,6 +80,7 @@ public class HttpReportJobRunner implements ReportJobRunner {
 
         Set<String> availableReports = Set.copyOf(status.files());
         job.recordAvailableReports(availableReports);
+        job.recordErrors(status.errors());
 
         if ("DONE".equals(status.status())) {
             job.markDone(availableReports,

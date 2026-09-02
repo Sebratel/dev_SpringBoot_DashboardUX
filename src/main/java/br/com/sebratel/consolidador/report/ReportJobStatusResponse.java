@@ -22,7 +22,8 @@ public record ReportJobStatusResponse(
         String createdAt,
         long elapsedSeconds,
         List<StepResponse> steps,
-        Map<String, String> reportDownloadUrls
+        Map<String, String> reportDownloadUrls,
+        Map<String, String> errors
 ) {
 
     static ReportJobStatusResponse from(ReportJob job) {
@@ -62,7 +63,8 @@ public record ReportJobStatusResponse(
                 job.getCreatedAt().toString(),
                 job.getElapsed().getSeconds(),
                 steps,
-                reportDownloadUrls
+                reportDownloadUrls,
+                job.getErrors()
         );
     }
 

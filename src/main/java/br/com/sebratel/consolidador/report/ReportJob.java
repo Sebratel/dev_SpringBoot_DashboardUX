@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,6 +48,14 @@ public class ReportJob {
      * getResultFile) e uma etapa futura.
      */
     private final AtomicReference<Set<String>> availableReports = new AtomicReference<>(Set.of());
+    /**
+     * Erro de CADA relatorio que falhou ("atendimento"/"hsm"/"hsmPosInstalacao"
+     * -> mensagem), mesmo quando outros relatorios deram certo (falha
+     * parcial) - permite o frontend mostrar um aviso pontual por relatorio
+     * em vez de bloquear a tela inteira so porque um dos tres falhou. Ver
+     * recordErrors()/HttpReportJobRunner.
+     */
+    private final AtomicReference<Map<String, String>> errors = new AtomicReference<>(Map.of());
 
     private final AtomicLong pid = new AtomicLong(-1);
     private final AtomicReference<Instant> finishedAt = new AtomicReference<>();
@@ -108,6 +117,15 @@ public class ReportJob {
      */
     public void recordAvailableReports(Set<String> availableReports) {
         this.availableReports.set(availableReports);
+    }
+
+    public Map<String, String> getErrors() {
+        return errors.get();
+    }
+
+    /** Erro por relatorio que falhou, independente do job terminar em DONE ou FAILED - ver campo `errors`. */
+    public void recordErrors(Map<String, String> errors) {
+        this.errors.set(errors);
     }
 
     /** PID do processo Node do servico de automacao, ou -1 se ainda nao conhecido. */
